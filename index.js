@@ -8,6 +8,7 @@
 	const csrf = require('csurf');
 	const cookieParser = require('cookie-parser');
 	const fileUploader = require('express-fileupload');
+	const auth = require('basic-auth')
 	const fs = require('fs');
 	const walk    = require('walk');
 	const files = [];
@@ -65,12 +66,23 @@ const walker  = walk.walk('./image', { followLinks: false });
 	});
 
 	app.get(`/images`, function (req, res) {
-  const pathImage = `${__dirname}/image/${req.query.image}`
-  fs.readFile(pathImage, function(err, data){
-    if(err) throw err
-    res.header('Content-Type', 'image/jpg')
-    res.send(data)
-  })
+  if (!auth(req)) {
+    res.set('WWW-Authenticate', 'Basic realm="image access"')
+    return res.status(401).send()
+  }
+  let { name, pass } = auth(req)
+  name = escape(name)
+  pass = escape(pass)
+  if (name === process.env.USER && pass === process.env.PASS) {
+    const pathImage = `${__dirname}/image/${req.query.image}`
+    fs.readFile(pathImage, function (err, data) {
+      if (err) throw err
+      res.header('Content-Type', 'image/jpg')
+      res.send(data)
+    })
+  } else {
+    return res.status(401).send('bad creds')
+  }
 })
 
 	app.post('/fileupload', function (req, res){
